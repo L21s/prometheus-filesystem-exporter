@@ -5,10 +5,6 @@ A very simple exporter that reads files from a given directory and exports their
 
 The easiest way is to use docker:
 
-## Usage
-
-The easiest way is to use docker:
-
 ```shell
 docker run \ 
 -v /host/metrics:/container/metrics \
