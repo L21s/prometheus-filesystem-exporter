@@ -56,7 +56,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	http.Handle("/metrics", promhttp.Handler())
+	http.Handle(*metricsPath, promhttp.Handler())
+	log.Println("Watching " + *metricsDir + " for metrics")
 	log.Fatal(http.ListenAndServe(*listenAddr, nil))
 }
 
