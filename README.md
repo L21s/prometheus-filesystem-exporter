@@ -5,9 +5,6 @@ A very simple exporter that reads files from a given directory and exports their
 
 The easiest way is to use docker:
 
-# Prometheus Filesystem Exporter
-A very simple exporter that reads files from a given directory and exports their contents as gauges.
-
 ## Usage
 
 The easiest way is to use docker:
@@ -28,7 +25,7 @@ To add a new metric, simply write a file with it's name to the `metrics` directo
 touch /host/metrics/answer_to_everything
 ```
 
-You will see that the exporter immediately picks up the value:
+You will see that the exporter immediately picks up the metric:
 
 ```shell
 curl -s http://localhost:8080/metrics | grep answer_to_everything
