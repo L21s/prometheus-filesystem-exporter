@@ -1,5 +1,5 @@
 # Prometheus Filesystem Exporter
-A very simple exporter that reads files from a given directory and exports their contents as gauges.
+A very simple exporter that reads files from a given directory and exports their contents as untyped metrics.
 
 ## Usage
 
@@ -15,10 +15,10 @@ larscheidschmitzhermes/prometheus-filesystem-exporter:latest \
 --listen-addr :8080
 ```
 
-To add a new metric, simply write a file with it's name to the `metrics` directory:
+To add a new metric, simply write a file with it's name (_optionally_ followed by the labels you want to assign) to the `metrics` directory:
 
 ```shell
-touch /host/metrics/answer_to_everything
+touch '/host/metrics/answer_to_everything;scope=universe;env=prod'
 ```
 
 You will see that the exporter immediately picks up the metric:
@@ -26,14 +26,14 @@ You will see that the exporter immediately picks up the metric:
 ```shell
 curl -s http://localhost:8080/metrics | grep answer_to_everything
 # HELP answer_to_everything Auto generated from filesystem path: /container/metrics/answer_to_everything
-# TYPE answer_to_everything gauge
-answer_to_everything 0
+# TYPE answer_to_everything untyped
+answer_to_everything{scope="universe",env="prod"} 0
 ```
 
 Setting the value is as easy as writing to the file:
 
 ```shell
-echo "42" > /host/metrics/answer_to_everything
+echo "42" > '/host/metrics/answer_to_everything;scope=universe;env=prod'
 ```
 
 The update happens right away:
@@ -42,7 +42,7 @@ The update happens right away:
 curl -s http://localhost:8080/metrics | grep answer_to_everything
 # HELP answer_to_everything Auto generated from filesystem path: /container/metrics/answer_to_everything
 # TYPE answer_to_everything gauge
-answer_to_everything 42
+answer_to_everything{scope="universe",env="prod"} 42
 ```
 
 ## Configuration

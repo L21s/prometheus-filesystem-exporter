@@ -19,7 +19,7 @@ var (
 	metricsDir  = flag.String("metrics-directory", "/metrics", "The directory to read metrics from")
 	metricsPath = flag.String("metrics-path", "/metrics", "The http path under which metrics are exposed")
 	listenAddr  = flag.String("listen-addr", ":8080", "The address to listen on for http requests")
-	gauges      = make(map[string]prometheus.Gauge)
+	metrics     = make(map[string]prometheus.Untyped)
 )
 
 func main() {
@@ -38,12 +38,12 @@ func main() {
 			case event := <-watcher.Events:
 				switch event.Op {
 				case fsnotify.Create:
-					getOrCreateGaugeForPath(event.Name)
-					updateGauge(event.Name)
+					getOrCreateMetricForPath(event.Name)
+					updateMetric(event.Name)
 				case fsnotify.Write:
-					updateGauge(event.Name)
+					updateMetric(event.Name)
 				case fsnotify.Remove:
-					removeGauge(event.Name)
+					removeMetric(event.Name)
 				}
 			case err := <-watcher.Errors:
 				log.Println("error:", err)
@@ -61,31 +61,32 @@ func main() {
 	log.Fatal(http.ListenAndServe(*listenAddr, nil))
 }
 
-func getOrCreateGaugeForPath(path string) prometheus.Gauge {
+func getOrCreateMetricForPath(path string) prometheus.Untyped {
 	if pathIsDir(path) {
 		return nil
 	}
-	gauge := gauges[path]
-	if gauge != nil {
-		return gauge
+	metric := metrics[path]
+	if metric != nil {
+		return metric
 	}
-	log.Println("Attempting to generate gauge from file: " + path)
-	gauge = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Name: filenameFromPath(path),
-			Help: "Auto generated from filesystem path: " + path,
+	log.Println("Attempting to generate metric from file: " + path)
+	metric = prometheus.NewUntyped(
+		prometheus.UntypedOpts{
+			Name:        metricNameFromPath(path),
+			Help:        "Auto generated from filesystem path: " + path,
+			ConstLabels: labelsFromPath(path),
 		})
-	prometheus.MustRegister(gauge)
-	gauges[path] = gauge
-	return gauge
+	prometheus.MustRegister(metric)
+	metrics[path] = metric
+	return metric
 }
 
-func updateGauge(path string) {
+func updateMetric(path string) {
 	if pathIsDir(path) {
 		return
 	}
-	log.Println("Attempting to update gauge with value written to: " + path)
-	gauge := getOrCreateGaugeForPath(path)
+	log.Println("Attempting to update metric with value written to: " + path)
+	metric := getOrCreateMetricForPath(path)
 	dat, err := ioutil.ReadFile(path)
 	if err != nil {
 		log.Println(err)
@@ -96,18 +97,18 @@ func updateGauge(path string) {
 		log.Println(err)
 		return
 	}
-	log.Println("Setting gauge for " + path + " to " + strconv.FormatFloat(value, 'f', 10, 64))
-	gauge.Set(value)
+	log.Println("Setting metric for " + path + " to " + strconv.FormatFloat(value, 'f', 10, 64))
+	metric.Set(value)
 }
 
-func removeGauge(path string) {
-	log.Println("Attempting to remove gauge because of deleted file: " + path)
-	gauge := gauges[path]
-	if gauge == nil {
+func removeMetric(path string) {
+	log.Println("Attempting to remove metric because of deleted file: " + path)
+	metric := metrics[path]
+	if metric == nil {
 		return
 	}
-	prometheus.Unregister(gauge)
-	delete(gauges, path)
+	prometheus.Unregister(metric)
+	delete(metrics, path)
 }
 
 func pathIsDir(path string) bool {
@@ -128,4 +129,24 @@ func pathIsDir(path string) bool {
 func filenameFromPath(path string) string {
 	var pathComponents = strings.Split(path, "/")
 	return pathComponents[len(pathComponents)-1]
+}
+
+func metricNameFromPath(path string) string {
+	return strings.Split(filenameFromPath(path), ";")[0]
+}
+
+func labelsFromPath(path string) map[string]string {
+	labels := make(map[string]string)
+	labelsFromFilename := strings.Split(filenameFromPath(path), ";")
+	//remove the first element - it's the metrics name
+	labelsFromFilename = labelsFromFilename[1:]
+	for _, labelPair := range labelsFromFilename {
+		splittedLabelPair := strings.Split(labelPair, "=")
+		if len(splittedLabelPair) != 2 {
+			log.Println(labelPair + " in file" + path + " is invalid - please make sure all filenames have the following format: metricName;label=value;label=value")
+			continue
+		}
+		labels[splittedLabelPair[0]] = splittedLabelPair[1]
+	}
+	return labels
 }
