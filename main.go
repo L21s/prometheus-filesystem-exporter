@@ -73,7 +73,7 @@ func getOrCreateMetricForPath(path string) prometheus.Untyped {
 	metric = prometheus.NewUntyped(
 		prometheus.UntypedOpts{
 			Name:        metricNameFromPath(path),
-			Help:        "Auto generated from filesystem path: " + path,
+			Help:        "Auto generated from filesystem path: " + *metricsDir + "/" + metricNameFromPath(path),
 			ConstLabels: labelsFromPath(path),
 		})
 	prometheus.MustRegister(metric)
