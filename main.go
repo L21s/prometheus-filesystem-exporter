@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -24,6 +25,14 @@ var (
 
 func main() {
 	flag.Parse()
+
+	files, err := filepath.Glob(filepath.Join(*metricsDir, "*"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, file := range files {
+		updateMetric(file)
+	}
 
 	watcher, err := fsnotify.NewWatcher()
 
