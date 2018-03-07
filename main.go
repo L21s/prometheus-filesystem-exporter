@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -19,11 +20,19 @@ var (
 	metricsDir  = flag.String("metrics-directory", "/metrics", "The directory to read metrics from")
 	metricsPath = flag.String("metrics-path", "/metrics", "The http path under which metrics are exposed")
 	listenAddr  = flag.String("listen-addr", ":8080", "The address to listen on for http requests")
-	metrics     = make(map[string]prometheus.Untyped)
+	metrics     = make(map[string]*prometheus.GaugeVec)
 )
 
 func main() {
 	flag.Parse()
+
+	files, err := filepath.Glob(filepath.Join(*metricsDir, "*"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, file := range files {
+		updateMetric(file)
+	}
 
 	watcher, err := fsnotify.NewWatcher()
 
@@ -38,7 +47,6 @@ func main() {
 			case event := <-watcher.Events:
 				switch event.Op {
 				case fsnotify.Create:
-					getOrCreateMetricForPath(event.Name)
 					updateMetric(event.Name)
 				case fsnotify.Write:
 					updateMetric(event.Name)
@@ -61,23 +69,26 @@ func main() {
 	log.Fatal(http.ListenAndServe(*listenAddr, nil))
 }
 
-func getOrCreateMetricForPath(path string) prometheus.Untyped {
-	if pathIsDir(path) {
-		return nil
-	}
-	metric := metrics[path]
-	if metric != nil {
+func getOrCreateMetricForPath(path string) *prometheus.GaugeVec {
+	metricName := metricNameFromPath(path)
+	metric, ok := metrics[metricName]
+	if ok {
 		return metric
 	}
 	log.Println("Attempting to generate metric from file: " + path)
-	metric = prometheus.NewUntyped(
-		prometheus.UntypedOpts{
-			Name:        metricNameFromPath(path),
-			Help:        "Auto generated from filesystem path: " + *metricsDir + "/" + metricNameFromPath(path),
-			ConstLabels: labelsFromPath(path),
-		})
+	labels := labelsFromPath(path)
+	labelKeys := make([]string, 0, len(labels))
+	for k := range labels {
+		labelKeys = append(labelKeys, k)
+	}
+	metric = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: metricName,
+			Help: "Auto generated from filesystem path: " + *metricsDir + "/" + metricName,
+		},
+		labelKeys)
 	prometheus.MustRegister(metric)
-	metrics[path] = metric
+	metrics[metricName] = metric
 	return metric
 }
 
@@ -98,7 +109,7 @@ func updateMetric(path string) {
 		return
 	}
 	log.Println("Setting metric for " + path + " to " + strconv.FormatFloat(value, 'f', 10, 64))
-	metric.Set(value)
+	metric.With(labelsFromPath(path)).Set(value)
 }
 
 func removeMetric(path string) {
