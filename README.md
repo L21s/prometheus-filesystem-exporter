@@ -54,3 +54,4 @@ The following flags can be passed to the `prometheus-filesystem-exporter`:
 | `--listen-addr`         | `:8080`     | The address to listen on for http requests
 | `--metrics-directory`   | `/metrics`  | The directory to read metrics from |
 | `--metrics-path`        | `/metrics`  | The http path under which metrics are exposed
+| `--silent`              | `false`     | Silent mode - no logging of metric changes

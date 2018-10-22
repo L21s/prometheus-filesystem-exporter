@@ -20,6 +20,7 @@ var (
 	metricsDir  = flag.String("metrics-directory", "/metrics", "The directory to read metrics from")
 	metricsPath = flag.String("metrics-path", "/metrics", "The http path under which metrics are exposed")
 	listenAddr  = flag.String("listen-addr", ":8080", "The address to listen on for http requests")
+	silent      = flag.Bool("silent", false, "Silent mode - no logging of metric changes")
 	metrics     = make(map[string]*prometheus.GaugeVec)
 )
 
@@ -65,7 +66,9 @@ func main() {
 	}
 
 	http.Handle(*metricsPath, promhttp.Handler())
-	log.Println("Watching " + *metricsDir + " for metrics")
+	if !*silent {
+		log.Println("Watching " + *metricsDir + " for metrics")
+	}
 	log.Fatal(http.ListenAndServe(*listenAddr, nil))
 }
 
@@ -75,7 +78,9 @@ func getOrCreateMetricForPath(path string) *prometheus.GaugeVec {
 	if ok {
 		return metric
 	}
-	log.Println("Attempting to generate metric from file: " + path)
+	if !*silent {
+		log.Println("Attempting to generate metric from file: " + path)
+	}
 	labels := labelsFromPath(path)
 	labelKeys := make([]string, 0, len(labels))
 	for k := range labels {
@@ -96,7 +101,9 @@ func updateMetric(path string) {
 	if pathIsDir(path) {
 		return
 	}
-	log.Println("Attempting to update metric with value written to: " + path)
+	if !*silent {
+		log.Println("Attempting to update metric with value written to: " + path)
+	}
 	metric := getOrCreateMetricForPath(path)
 	dat, err := ioutil.ReadFile(path)
 	if err != nil {
@@ -108,12 +115,16 @@ func updateMetric(path string) {
 		log.Println(err)
 		return
 	}
-	log.Println("Setting metric for " + path + " to " + strconv.FormatFloat(value, 'f', 10, 64))
+	if !*silent {
+		log.Println("Setting metric for " + path + " to " + strconv.FormatFloat(value, 'f', 10, 64))
+	}
 	metric.With(labelsFromPath(path)).Set(value)
 }
 
 func removeMetric(path string) {
-	log.Println("Attempting to remove metric because of deleted file: " + path)
+	if !*silent {
+		log.Println("Attempting to remove metric because of deleted file: " + path)
+	}
 	metric := metrics[path]
 	if metric == nil {
 		return
