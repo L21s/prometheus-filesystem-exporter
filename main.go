@@ -118,6 +118,11 @@ func updateMetric(path string) {
 	if !*silent {
 		log.Println("Setting metric for " + path + " to " + strconv.FormatFloat(value, 'f', 10, 64))
 	}
+	defer func() {
+		if r := recover(); r != nil {
+			log.Println("Error in metric:", r)
+		}
+	}()
 	metric.With(labelsFromPath(path)).Set(value)
 }
 
